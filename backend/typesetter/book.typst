@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 // The pandoc template that sets a manuscript as a book with Typst. pandoc
-// fills the $...$ variables; typesetter/run.py passes the layout as -V.
+// fills its template variables; typesetter/run.py passes the layout as -V.
 //
 // Headings at chapter-level start a page; headings above it are part
 // titles on a page of their own; headings below it are set in the text.
