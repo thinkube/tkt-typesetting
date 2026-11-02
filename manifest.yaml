@@ -1,0 +1,14 @@
+# Copyright Alejandro Martínez Corriá and the Thinkube contributors
+# SPDX-License-Identifier: MIT
+
+apiVersion: thinkube.io/v1
+kind: TemplateManifest
+metadata:
+  name: tkt-typesetting
+  title: Book Typesetting
+  description: Typesets a Markdown manuscript as a print-ready PDF with Typst, and as EPUB and Word with pandoc, in a serif face chosen from EB Garamond, Crimson Pro and Libertinus Serif. Each book runs as an Argo workflow step. React upload page, REST API with API tokens, PostgreSQL history.
+  version: 1.0.0
+  author: Alejandro Martínez Corriá
+  tags: ["typesetting", "typst", "pandoc", "pdf", "epub", "docx", "books", "workflows", "fastapi", "react"]
+
+parameters: []

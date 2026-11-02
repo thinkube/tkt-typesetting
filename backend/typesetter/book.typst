@@ -1,0 +1,127 @@
+// Copyright Alejandro Martínez Corriá and the Thinkube contributors
+// SPDX-License-Identifier: MIT
+//
+// The pandoc template that sets a manuscript as a book with Typst. pandoc
+// fills the $...$ variables; typesetter/run.py passes the layout as -V.
+//
+// Headings at chapter-level start a page; headings above it are part
+// titles on a page of their own; headings below it are set in the text.
+// A thematic break (*** in Markdown) is a scene break.
+
+#set terms(hanging-indent: 1.5em)
+#set table(inset: 6pt, stroke: none)
+
+#let content-to-string(content) = {
+  if content.has("text") {
+    content.text
+  } else if content.has("children") {
+    content.children.map(content-to-string).join("")
+  } else if content.has("body") {
+    content-to-string(content.body)
+  } else if content == [ ] {
+    " "
+  }
+}
+
+// pandoc writes a thematic break as #divider() (and as #horizontalRule
+// before 3.13); in a book it is a scene break.
+#let scene-break = align(center, block(above: 1.2em, below: 1.2em)[\*#h(1.2em)\*#h(1.2em)\*])
+#let divider(..args) = scene-break
+#let horizontalRule = scene-break
+
+$if(highlighting-definitions)$
+$highlighting-definitions$
+
+$endif$
+#let chapter-level = $chapter-level$
+
+#set document(
+$if(title)$
+  title: [$title$],
+$endif$
+$if(author)$
+  author: ($for(author)$"$author/nowrap$"$sep$, $endfor$),
+$endif$
+)
+
+#set page(
+  width: $page-width$,
+  height: $page-height$,
+  margin: (inside: $margin-inside$, outside: $margin-outside$, top: $margin-top$, bottom: $margin-bottom$),
+  binding: left,
+  numbering: "1",
+  number-align: center,
+)
+
+#set text(
+  font: ("$font$",),
+  size: $font-size$,
+  lang: "$lang$",
+  hyphenate: true,
+  costs: (widow: 100%, orphan: 100%),
+)
+
+#set par(
+  justify: true,
+  leading: 0.62em,
+  spacing: 0.62em,
+  first-line-indent: 1.2em,
+)
+
+#show heading: set text(weight: "regular", hyphenate: false)
+#show heading: set align(center)
+
+#show heading: it => {
+  if it.level < chapter-level {
+    pagebreak(weak: true)
+    page(numbering: none)[
+      #v(1fr)
+      #text(size: 1.6em)[#it.body]
+      #v(2fr)
+    ]
+  } else if it.level == chapter-level {
+    pagebreak(weak: true)
+    v(18%)
+    block(below: 2.4em, text(size: 1.4em)[#it.body])
+  } else {
+    block(above: 1.6em, below: 1em, text(size: 1.1em, style: "italic")[#it.body])
+  }
+}
+
+$if(smart)$
+$else$
+#set smartquote(enabled: false)
+
+$endif$
+$for(header-includes)$
+$header-includes$
+
+$endfor$
+$if(title)$
+#page(numbering: none)[
+  #set align(center)
+  #v(1fr)
+  #text(size: 2em, hyphenate: false)[$title$]
+$if(subtitle)$
+  #v(0.8em)
+  #text(size: 1.3em, style: "italic")[$subtitle$]
+$endif$
+$if(author)$
+  #v(2.5em)
+  #text(size: 1.2em)[$for(author)$$author$$sep$ · $endfor$]
+$endif$
+  #v(2fr)
+]
+#counter(page).update(1)
+
+$endif$
+$if(book-toc)$
+#page(numbering: none)[
+  #outline(depth: $chapter-level$)
+]
+#counter(page).update(1)
+
+$endif$
+$body$
+
+#context [#metadata(counter(page).final().first()) <page-count>]

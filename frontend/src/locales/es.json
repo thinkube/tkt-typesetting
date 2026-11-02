@@ -1,0 +1,170 @@
+{
+  "app": {
+    "title": "Maquetación"
+  },
+  "nav": {
+    "workspace": "Espacio de trabajo",
+    "home": "Libros",
+    "settings": "Configuracion",
+    "apiTokens": "Tokens API",
+    "account": "Cuenta",
+    "logout": "Cerrar sesion"
+  },
+  "books": {
+    "title": "Maquetación de libros",
+    "subtitle": "Maqueta un manuscrito en Markdown como PDF listo para imprenta, libro electrónico EPUB y documento de Word",
+    "newTitle": "Nuevo libro",
+    "newSubtitle": "Un manuscrito en Markdown, de hasta {{mb}} MB. El título y la autoría salen de su cabecera YAML. Se maqueta en un paso de workflow; esta página lo sigue.",
+    "manuscript": "Manuscrito (.md)",
+    "tooLarge": "El archivo ocupa más de {{mb}} MB.",
+    "formats": "Formatos",
+    "font": "Tipografía",
+    "paper": "Tamaño de página",
+    "language": "Idioma",
+    "languageHelp": "Lo siguen la división de palabras, las comillas y el título del índice.",
+    "fontSize": "Tamaño del texto (pt)",
+    "fontSizeRange": "Entre {{min}} y {{max}} puntos.",
+    "chapterLevel": "Encabezado de capítulo",
+    "chapterLevelHelp": "Los encabezados de este nivel empiezan página nueva; los de nivel superior tienen página propia.",
+    "toc": "Índice",
+    "typeset": "Maquetar",
+    "started": "Maquetando {{name}}",
+    "startFailed": "No se pudo empezar la maquetación",
+    "optionsFailed": "No se pudieron cargar las opciones de maquetación",
+    "loadFailed": "No se pudieron cargar los libros",
+    "listTitle": "Tus libros",
+    "empty": "Todavía no hay libros. Sube un manuscrito arriba.",
+    "pagesIn": "{{pages}} páginas en {{seconds}} s",
+    "doneIn": "Hecho en {{seconds}} s",
+    "logs": "Workflow y registros",
+    "deleted": "Libro borrado",
+    "deleteFailed": "No se pudo borrar el libro",
+    "confirmDeleteTitle": "Borrar libro",
+    "confirmDelete": "¿Borrar {{name}}, su manuscrito y sus archivos?",
+    "downloadFailed": "La descarga ha fallado",
+    "table": {
+      "manuscript": "Manuscrito",
+      "layout": "Maquetación",
+      "status": "Estado",
+      "outputs": "Descargas"
+    },
+    "status": {
+      "queued": "En cola",
+      "running": "Maquetando",
+      "succeeded": "Hecho",
+      "failed": "Fallido"
+    },
+    "formatNames": {
+      "pdf": "PDF",
+      "epub": "EPUB",
+      "docx": "Word"
+    }
+  },
+  "apiTokens": {
+    "title": "Tokens API",
+    "subtitle": "Los tokens permiten que scripts y herramientas llamen a la API de esta aplicacion en tu nombre",
+    "createToken": {
+      "title": "Crear nuevo token",
+      "nameLabel": "Nombre del token",
+      "namePlaceholder": "Mi token API",
+      "expiresLabel": "Expira en (dias)",
+      "expiresPlaceholder": "Dejar vacio para sin expiracion",
+      "createButton": "Crear token"
+    },
+    "tokenCreated": {
+      "title": "Token creado con exito!",
+      "message": "Copia este token ahora. No podras verlo de nuevo.",
+      "copyButton": "Copiar al portapapeles",
+      "copied": "Token copiado al portapapeles!"
+    },
+    "tokenList": {
+      "title": "Tus tokens",
+      "noTokens": "No hay tokens API todavia. Crea uno arriba!",
+      "table": {
+        "name": "Nombre",
+        "created": "Creado",
+        "expires": "Expira",
+        "lastUsed": "Ultimo uso",
+        "actions": "Acciones",
+        "never": "Nunca",
+        "revoke": "Revocar",
+        "revoked": "Revocado"
+      },
+      "confirmRevoke": "Estas seguro de que quieres revocar este token?",
+      "confirmRevokeTitle": "Revocar token"
+    },
+    "usage": {
+      "title": "Como usar los tokens API",
+      "cli": {
+        "title": "CLI / curl",
+        "description": "Incluye el token en el encabezado Authorization:"
+      },
+      "env": {
+        "title": "Variable de entorno",
+        "description": "Define el token una vez y deja que tus herramientas lo lean:"
+      }
+    },
+    "errors": {
+      "createFailed": "Error al crear el token",
+      "revokeFailed": "Error al revocar el token",
+      "loadFailed": "Error al cargar los tokens",
+      "nameMissing": "Por favor proporciona un nombre para el token"
+    },
+    "success": {
+      "created": "Token creado",
+      "revoked": "Token revocado"
+    }
+  },
+  "profile": {
+    "roles": "Roles"
+  },
+  "theme": {
+    "toggle": "Cambiar tema"
+  },
+  "language": {
+    "label": "Idioma"
+  },
+  "auth": {
+    "loginTitle": "Iniciar Sesion",
+    "loginMessage": "Por favor inicia sesion para acceder a la aplicacion",
+    "loginButton": "Iniciar sesion con Keycloak",
+    "loggingIn": "Completando autenticacion...",
+    "loginSuccess": "Autenticacion exitosa. Redirigiendo...",
+    "loginFailed": "Error de autenticacion",
+    "noCode": "No se recibio codigo de autorizacion",
+    "redirecting": "Redirigiendo al inicio de sesion...",
+    "redirectingMessage": "Por favor espera mientras te redirigimos a Keycloak.",
+    "configError": "Error de configuracion de autenticacion. Por favor revisa la consola para mas detalles.",
+    "tryAgain": "Reintentar"
+  },
+  "errors": {
+    "notFound": {
+      "title": "404",
+      "heading": "Pagina no encontrada",
+      "message": "La pagina que buscas no existe o ha sido movida.",
+      "backButton": "Volver al inicio"
+    },
+    "loadingApp": {
+      "title": "Error al cargar la aplicacion",
+      "message": "No se pudo cargar la informacion del usuario.",
+      "reload": "Recargar"
+    },
+    "general": {
+      "loading": "Cargando..."
+    }
+  },
+  "common": {
+    "open": "Abrir",
+    "close": "Cerrar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "create": "Crear",
+    "update": "Actualizar",
+    "back": "Atras",
+    "next": "Siguiente",
+    "yes": "Si",
+    "no": "No"
+  }
+}

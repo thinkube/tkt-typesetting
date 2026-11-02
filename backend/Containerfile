@@ -1,0 +1,78 @@
+# Copyright Alejandro Martínez Corriá and the Thinkube contributors
+# SPDX-License-Identifier: MIT
+
+ARG CONTAINER_REGISTRY
+FROM ${CONTAINER_REGISTRY}/library/python-base:3.12-slim
+
+WORKDIR /app
+
+# Web API packages beyond the base image
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# The typesetting step: pandoc writes EPUB, Word and the Typst source, Typst
+# sets the PDF. Both are pinned, and the architecture is read from the image
+# so the same file builds on amd64 and arm64.
+ARG PANDOC_VERSION=3.13
+ARG TYPST_VERSION=v0.15.1
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates curl fontconfig unzip xz-utils && \
+    rm -rf /var/lib/apt/lists/* && \
+    DEB_ARCH="$(dpkg --print-architecture)" && \
+    curl --retry 5 --retry-delay 5 --retry-all-errors -fsSL \
+        "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-${DEB_ARCH}.deb" \
+        -o /tmp/pandoc.deb && \
+    dpkg -i /tmp/pandoc.deb && \
+    rm /tmp/pandoc.deb && \
+    pandoc --version | head -1 | grep -qx "pandoc ${PANDOC_VERSION}" && \
+    TYPST_ARCH="$(uname -m)" && \
+    case "${TYPST_ARCH}" in x86_64|aarch64) ;; *) echo "Unsupported architecture: ${TYPST_ARCH}" >&2; exit 1 ;; esac && \
+    curl --retry 5 --retry-delay 5 --retry-all-errors -fsSL \
+        "https://github.com/typst/typst/releases/download/${TYPST_VERSION}/typst-${TYPST_ARCH}-unknown-linux-musl.tar.xz" \
+        -o /tmp/typst.tar.xz && \
+    tar -xJf /tmp/typst.tar.xz -C /tmp && \
+    install -m 0755 "/tmp/typst-${TYPST_ARCH}-unknown-linux-musl/typst" /usr/local/bin/typst && \
+    rm -rf /tmp/typst.tar.xz "/tmp/typst-${TYPST_ARCH}-unknown-linux-musl" && \
+    typst --version
+
+# The serif faces typesetter/options.py offers, one directory per family
+# under /usr/local/share/fonts. Each is pinned to a commit or a release. The
+# build stops if Typst does not see a family by the name options.py uses.
+ARG EB_GARAMOND_COMMIT=106a4a6d377987459ae5e68673a4570f13b957fb
+ARG CRIMSON_PRO_COMMIT=475ca6a0469ba2bd9c2a3bbf038957099392c04d
+ARG LIBERTINUS_VERSION=7.051
+RUN mkdir -p /usr/local/share/fonts/ebgaramond /usr/local/share/fonts/crimsonpro /usr/local/share/fonts/libertinus && \
+    for style in Regular Italic Medium MediumItalic SemiBold SemiBoldItalic Bold BoldItalic; do \
+        curl --retry 5 --retry-delay 5 --retry-all-errors -fsSL \
+            "https://raw.githubusercontent.com/octaviopardo/EBGaramond12/${EB_GARAMOND_COMMIT}/fonts/otf/EBGaramond-${style}.otf" \
+            -o "/usr/local/share/fonts/ebgaramond/EBGaramond-${style}.otf" && \
+        curl --retry 5 --retry-delay 5 --retry-all-errors -fsSL \
+            "https://raw.githubusercontent.com/Fonthausen/CrimsonPro/${CRIMSON_PRO_COMMIT}/fonts/ttf/CrimsonPro-${style}.ttf" \
+            -o "/usr/local/share/fonts/crimsonpro/CrimsonPro-${style}.ttf" || exit 1; \
+    done && \
+    curl --retry 5 --retry-delay 5 --retry-all-errors -fsSL \
+        "https://github.com/alerque/libertinus/releases/download/v${LIBERTINUS_VERSION}/Libertinus-${LIBERTINUS_VERSION}.zip" \
+        -o /tmp/libertinus.zip && \
+    unzip -q -j /tmp/libertinus.zip "Libertinus-${LIBERTINUS_VERSION}/static/OTF/LibertinusSerif-*.otf" \
+        -d /usr/local/share/fonts/libertinus && \
+    rm /tmp/libertinus.zip && \
+    fc-cache -f && \
+    for family in "EB Garamond" "Crimson Pro" "Libertinus Serif"; do \
+        typst fonts --font-path /usr/local/share/fonts | grep -qx "${family}" || \
+            { echo "Typst does not see the ${family} face" >&2; exit 1; }; \
+    done
+
+COPY app /app/app
+COPY typesetter /app/typesetter
+COPY alembic /app/alembic
+COPY alembic.ini /app/alembic.ini
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+ENV PYTHONPATH=/app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 8000
+
+CMD ["/app/start.sh"]

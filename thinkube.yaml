@@ -1,0 +1,55 @@
+# Copyright Alejandro Martínez Corriá and the Thinkube contributors
+# SPDX-License-Identifier: MIT
+
+apiVersion: thinkube.io/v1
+kind: ThinkubeDeployment
+metadata:
+  # The application's version; the generated app starts at it.
+  version: "0.1.0"
+
+spec:
+  deployment:
+    type: app
+
+  containers:
+    - name: backend
+      build: ./backend
+      port: 8000
+      size: medium
+      health: /health
+      # Manuscripts are uploaded through the API
+      capabilities:
+        - large-uploads
+      test:
+        enabled: true
+        image: "python-base:3.12-slim"
+        command: "./run_tests.sh"
+        one: "./run_tests.sh <file>"
+      migrations:
+        tool: alembic
+        auto: true
+
+    - name: frontend
+      build: ./frontend
+      port: 80
+      size: small
+      health: /health
+      publicEnv:
+        - APP_TITLE
+      test:
+        enabled: true
+        # node-base carries git, which npm needs to install thinkube-style
+        image: "node-base:22-alpine"
+        command: "./run_tests.sh"
+        one: "./run_tests.sh <file>"
+
+  routes:
+    - path: /api
+      to: backend
+    - path: /
+      to: frontend
+
+  services:
+    - database
+    # Each book is typeset as a workflow step in the backend image
+    - workflows

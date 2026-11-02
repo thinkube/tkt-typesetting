@@ -1,0 +1,5 @@
+# What the web API and the tests need beyond the python-base image, which
+# carries FastAPI, SQLAlchemy, Alembic, PyJWT, boto3 and hera. The
+# typesetting step needs no Python packages: it runs pandoc and Typst,
+# which the Containerfile installs. Add a package here, pinned, when the
+# application needs one the base image does not have.
