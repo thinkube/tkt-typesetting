@@ -27,10 +27,35 @@ THEME = (
 )
 
 
+STYLES = (
+    '<w:styles><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:asciiTheme="minorHAnsi" />'
+    '<w:sz w:val="24" /><w:szCs w:val="24" /></w:rPr></w:rPrDefault>'
+    '<w:pPrDefault><w:pPr><w:spacing w:after="200" /></w:pPr></w:pPrDefault></w:docDefaults>'
+    '<w:style w:type="paragraph" w:styleId="BodyText"><w:name w:val="Body Text" />'
+    '<w:pPr><w:spacing w:before="180" w:after="180" /></w:pPr></w:style>'
+    '<w:style w:type="paragraph" w:customStyle="1" w:styleId="FirstParagraph"><w:name w:val="First Paragraph" />'
+    '<w:qFormat /></w:style>'
+    '<w:style w:type="paragraph" w:styleId="Title"><w:pPr><w:spacing w:after="80" w:line="240" /></w:pPr></w:style>'
+    + "".join(
+        f'<w:style w:type="paragraph" w:styleId="Heading{n}"><w:pPr><w:keepNext /><w:keepLines />'
+        f'<w:spacing w:before="160" w:after="80" /><w:outlineLvl w:val="{n - 1}" /></w:pPr>'
+        f'<w:rPr><w:color w:val="0F4761" w:themeColor="accent1" /><w:sz w:val="32" /></w:rPr></w:style>'
+        for n in (1, 2, 3))
+    + '</w:styles>'
+)
+
+
 def docx_with(theme: str) -> bytes:
+    """A reference document with the parts and the shapes pandoc's reference.docx has."""
     buffer = BytesIO()
     with ZipFile(buffer, "w") as z:
-        z.writestr("word/document.xml", "<w:document/>")
+        z.writestr("[Content_Types].xml", '<Types><Default Extension="xml" ContentType="application/xml" /></Types>')
+        z.writestr("word/document.xml", '<w:document xmlns:w="w"><w:body><w:p />'
+                   '<w:sectPr><w:footnotePr><w:numRestart w:val="eachSect" /></w:footnotePr></w:sectPr>'
+                   '</w:body></w:document>')
+        z.writestr("word/_rels/document.xml.rels", '<Relationships></Relationships>')
+        z.writestr("word/settings.xml", '<w:settings xmlns:w="w"><w:zoom w:percent="100" /></w:settings>')
+        z.writestr("word/styles.xml", STYLES)
         z.writestr("word/theme/theme1.xml", theme)
     return buffer.getvalue()
 
@@ -131,18 +156,62 @@ def test_the_contents_title_is_not_a_part_page():
     assert "if not it.outlined" in run.TEMPLATE.read_text(encoding="utf-8")
 
 
+def patched(layout=LAYOUT, theme=THEME):
+    z = ZipFile(BytesIO(run.reference_docx(docx_with(theme), layout)))
+    return {name: z.read(name).decode() for name in z.namelist()}
+
+
+def style(styles, style_id):
+    return re.search(rf'<w:style [^>]*w:styleId="{style_id}".*?</w:style>', styles, re.S).group(0)
+
+
 def test_the_word_reference_takes_the_face_in_both_theme_fonts():
-    patched = run.reference_docx(docx_with(THEME), "Crimson Pro")
-    with ZipFile(BytesIO(patched)) as z:
-        theme = z.read("word/theme/theme1.xml").decode()
-        assert z.read("word/document.xml") == b"<w:document/>"
-    assert re.findall(r'<a:latin typeface="([^"]*)"', theme) == ["Crimson Pro", "Crimson Pro"]
-    assert "panose" not in theme
+    parts = patched()
+    assert re.findall(r'<a:latin typeface="([^"]*)"', parts["word/theme/theme1.xml"]) == ["EB Garamond", "EB Garamond"]
+    assert "panose" not in parts["word/theme/theme1.xml"]
 
 
 def test_a_reference_without_theme_fonts_stops_the_run():
     with pytest.raises(run.ToolFailed, match="0 Latin theme fonts"):
-        run.reference_docx(docx_with("<a:theme/>"), "Crimson Pro")
+        run.reference_docx(docx_with("<a:theme/>"), LAYOUT)
+
+
+def test_word_pages_have_the_book_size_mirrored_margins_and_a_page_number():
+    parts = patched()
+    section = re.search(r"<w:sectPr>.*?</w:sectPr>", parts["word/document.xml"], re.S).group(0)
+    paper = PAPERS["15x23cm"]
+    assert f'<w:pgSz w:w="{round(paper.width_mm * 1440 / 25.4)}" w:h="{round(paper.height_mm * 1440 / 25.4)}" />' in section
+    assert f'w:left="{round(paper.inside_mm * 1440 / 25.4)}"' in section
+    assert f'w:right="{round(paper.outside_mm * 1440 / 25.4)}"' in section
+    assert f'<w:footerReference w:type="default" r:id="{run.FOOTER_ID}" />' in section
+    # No page number on the title page.
+    assert "<w:titlePg />" in section
+    assert "<w:mirrorMargins />" in parts["word/settings.xml"]
+    assert "PAGE" in parts[run.FOOTER_PART]
+    assert 'Target="footer1.xml"' in parts["word/_rels/document.xml.rels"]
+    assert 'PartName="/word/footer1.xml"' in parts["[Content_Types].xml"]
+
+
+def test_parts_and_chapters_start_a_page_and_paragraphs_are_set_as_in_a_book():
+    styles = patched()["word/styles.xml"]
+    for level in (1, 2):
+        heading = style(styles, f"Heading{level}")
+        assert "<w:pageBreakBefore />" in heading
+        assert '<w:jc w:val="center" />' in heading
+        assert "w:color" not in heading
+    assert "<w:pageBreakBefore />" not in style(styles, "Heading3")
+    body = style(styles, "BodyText")
+    assert '<w:ind w:firstLine="264" />' in body
+    assert '<w:jc w:val="both" />' in body
+    assert 'w:before="0" w:after="0"' in body
+    assert '<w:ind w:firstLine="0" />' in style(styles, "FirstParagraph")
+    assert '<w:sz w:val="22" />' in styles
+    assert '<w:spacing w:after="0" />' in styles
+
+
+def test_a_reference_that_changed_shape_stops_the_run():
+    with pytest.raises(run.ToolFailed, match="no style Heading1"):
+        run.docx_styles(STYLES.replace('w:styleId="Heading1"', 'w:styleId="Other"'), LAYOUT)
 
 
 def test_a_refused_layout_stops_before_any_tool(tmp_path, capsys, monkeypatch):

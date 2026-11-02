@@ -161,18 +161,129 @@ def epub_command(source: Path, work: Path, out: Path, layout: Layout) -> List[st
     return command
 
 
-def reference_docx(default: bytes, family: str) -> bytes:
-    """pandoc's reference.docx with both Latin theme fonts set to the family."""
+TWIPS_PER_MM = 1440 / 25.4
+FOOTER_PART = "word/footer1.xml"
+FOOTER_ID = "rIdTkFooter1"
+# A centred PAGE field: Word and LibreOffice print the page number in it.
+FOOTER_XML = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+    '<w:p><w:pPr><w:jc w:val="center"/></w:pPr>'
+    '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+    '<w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r>'
+    '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+    '<w:r><w:t>1</w:t></w:r>'
+    '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+    '</w:p></w:ftr>'
+)
+
+
+def replace_once(text: str, pattern: str, replacement: str, what: str) -> str:
+    """One regex replacement that must match exactly once; reference.docx changing shape stops the run."""
+    result, count = re.subn(pattern, replacement, text, flags=re.S)
+    if count != 1:
+        raise ToolFailed(f"reference.docx: {what} matched {count} times, not once")
+    return result
+
+
+def in_style(styles: str, style_id: str, edit) -> str:
+    """Apply edit to one style's XML."""
+    pattern = rf'<w:style [^>]*w:styleId="{style_id}".*?</w:style>'
+    match = re.search(pattern, styles, re.S)
+    if not match:
+        raise ToolFailed(f"reference.docx has no style {style_id}")
+    return styles[:match.start()] + edit(match.group(0)) + styles[match.end():]
+
+
+def docx_styles(styles: str, layout: Layout) -> str:
+    """Book styles: text size, justified indented paragraphs without space between them,
+    parts and chapters on a new page, centred and in the text colour, a lower title."""
+    size = round(layout.font_size * 2)
+    indent = round(1.2 * layout.font_size * 20)
+    styles = replace_once(styles, r'(<w:rPrDefault>.*?)<w:sz w:val="\d+" />\s*<w:szCs w:val="\d+" />',
+                          rf'\g<1><w:sz w:val="{size}" /><w:szCs w:val="{size}" />', "the default text size")
+    styles = replace_once(styles, r'(<w:pPrDefault>\s*<w:pPr>\s*)<w:spacing w:after="\d+" />',
+                          r'\g<1><w:spacing w:after="0" />', "the default paragraph spacing")
+    styles = in_style(styles, "BodyText", lambda s: replace_once(
+        s, r'<w:spacing w:before="\d+" w:after="\d+" />',
+        f'<w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto" />'
+        f'<w:ind w:firstLine="{indent}" /><w:jc w:val="both" />', "Body Text spacing"))
+    styles = in_style(styles, "FirstParagraph", lambda s: replace_once(
+        s, r'<w:qFormat />', '<w:qFormat /><w:pPr><w:ind w:firstLine="0" /></w:pPr>', "First Paragraph"))
+    styles = in_style(styles, "Title", lambda s: replace_once(
+        s, r'<w:spacing w:after="\d+"', '<w:spacing w:before="2880" w:after="480"', "Title spacing"))
+    for level in range(1, layout.chapter_level + 1):
+        before = 2400 if level == layout.chapter_level else 3600
+
+        def heading(s: str, before: int = before) -> str:
+            s = replace_once(s, r'<w:keepNext />', '<w:keepNext /><w:pageBreakBefore />', "heading keepNext")
+            s = replace_once(s, r'<w:spacing w:before="\d+" w:after="\d+" />',
+                             f'<w:spacing w:before="{before}" w:after="480" /><w:jc w:val="center" />',
+                             "heading spacing")
+            return replace_once(s, r'<w:color [^>]*/>', '', "heading colour")
+        styles = in_style(styles, f"Heading{level}", heading)
+    # The table of contents is based on Heading 1 and so starts a page too.
+    return styles
+
+
+def docx_section(document: str, layout: Layout) -> str:
+    """The section of the reference document, which pandoc gives the whole book: page
+    size, mirrored margins (inside is the binding edge) and the page-number footer,
+    left off the title page."""
+    paper = PAPERS[layout.paper]
+    tw = lambda mm: round(mm * TWIPS_PER_MM)
+    section = (
+        f'<w:sectPr><w:footerReference w:type="default" r:id="{FOOTER_ID}" />'
+        '<w:footnotePr><w:numRestart w:val="eachSect" /></w:footnotePr>'
+        f'<w:pgSz w:w="{tw(paper.width_mm)}" w:h="{tw(paper.height_mm)}" />'
+        f'<w:pgMar w:top="{tw(paper.top_mm)}" w:right="{tw(paper.outside_mm)}" w:bottom="{tw(paper.bottom_mm)}" '
+        f'w:left="{tw(paper.inside_mm)}" w:header="{tw(paper.top_mm / 2)}" w:footer="{tw(paper.bottom_mm / 2)}" '
+        'w:gutter="0" />'
+        '<w:titlePg /></w:sectPr>'
+    )
+    document = replace_once(document, r'<w:sectPr>.*?</w:sectPr>', section, "the section properties")
+    if 'xmlns:r="' not in document:
+        document = replace_once(document, r'<w:document ', '<w:document xmlns:r="http://schemas.openxmlformats.org/'
+                                'officeDocument/2006/relationships" ', "the document element")
+    return document
+
+
+def reference_docx(default: bytes, layout: Layout) -> bytes:
+    """pandoc's reference.docx set for the book: the face in both Latin theme fonts, the
+    book styles, the page and the footer with the page number."""
+    family = FONTS[layout.font].family
     source = ZipFile(BytesIO(default))
     target = BytesIO()
     replaced = 0
     with ZipFile(target, "w", ZIP_DEFLATED) as out:
         for item in source.infolist():
             data = source.read(item)
-            if item.filename == "word/theme/theme1.xml":
+            name = item.filename
+            if name == "word/theme/theme1.xml":
                 text, replaced = THEME_LATIN.subn(rf'\g<1>typeface="{family}"', data.decode("utf-8"))
                 data = text.encode("utf-8")
+            elif name == "word/styles.xml":
+                data = docx_styles(data.decode("utf-8"), layout).encode("utf-8")
+            elif name == "word/document.xml":
+                data = docx_section(data.decode("utf-8"), layout).encode("utf-8")
+            elif name == "word/settings.xml":
+                data = replace_once(data.decode("utf-8"), r'(<w:settings [^>]*>)', r'\g<1><w:mirrorMargins />',
+                                    "the settings element").encode("utf-8")
+            elif name == "word/_rels/document.xml.rels":
+                data = replace_once(
+                    data.decode("utf-8"), r'</Relationships>',
+                    f'<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
+                    f'footer" Id="{FOOTER_ID}" Target="footer1.xml" /></Relationships>',
+                    "the document relationships").encode("utf-8")
+            elif name == "[Content_Types].xml":
+                data = replace_once(
+                    data.decode("utf-8"), r'</Types>',
+                    f'<Override PartName="/{FOOTER_PART}" ContentType="application/vnd.openxmlformats-'
+                    'officedocument.wordprocessingml.footer+xml" /></Types>',
+                    "the content types").encode("utf-8")
             out.writestr(item, data)
+        out.writestr(FOOTER_PART, FOOTER_XML)
     if replaced != 2:
         raise ToolFailed(f"reference.docx has {replaced} Latin theme fonts, not the 2 the face replaces")
     return target.getvalue()
@@ -184,7 +295,7 @@ def docx_command(source: Path, work: Path, out: Path, layout: Layout) -> List[st
     if printed.returncode != 0:
         raise ToolFailed(f"pandoc could not print its reference.docx: {printed.stderr.decode().strip()}")
     default = printed.stdout
-    reference.write_bytes(reference_docx(default, FONTS[layout.font].family))
+    reference.write_bytes(reference_docx(default, layout))
     return pandoc_common(source, layout) + docx_options(out, reference, layout) + filter_args(layout)
 
 
