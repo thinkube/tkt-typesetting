@@ -120,7 +120,8 @@ def test_chapters_open_with_a_dropped_capital_from_the_packaged_droplet():
     assert '"#h(paragraph-indent)"' in lua
     assert "#let paragraph-indent = " in template
     assert "first-line-indent: paragraph-indent," in template
-    assert run.dropcap_args(LAYOUT) == [f"--lua-filter={run.DROPCAP_FILTER}", "--metadata=chapter-level=2"]
+    assert run.filter_args(LAYOUT) == [f"--lua-filter={run.SCENES_FILTER}", f"--lua-filter={run.DROPCAP_FILTER}",
+                                       "--metadata=chapter-level=2"]
 
 
 def test_the_contents_title_is_not_a_part_page():
@@ -159,3 +160,37 @@ def test_a_failing_tool_is_reported_in_its_own_words(monkeypatch):
     monkeypatch.setattr(run.subprocess, "run", lambda *a, **k: Result())
     with pytest.raises(run.ToolFailed, match="typst failed \\(exit 1\\): error: unknown font family"):
         run.run_tool(["typst", "compile", "book.typ"])
+
+
+def test_two_or_more_blank_lines_in_the_body_mark_a_scene_space():
+    manuscript = "---\ntitle: T\n\n\nauthor: A\n---\n\n# Uno\n\nUno.\nSigue.\n\nDos.\n\n\nTres.\n  \n\n\t\n\nCuatro.\n"
+    marked = run.mark_scene_breaks(manuscript)
+    # The front matter keeps its blank lines; one blank line is a paragraph break.
+    assert marked.startswith("---\ntitle: T\n\n\nauthor: A\n---\n")
+    assert "Uno.\nSigue.\n\nDos." in marked
+    assert marked.count("::: scene-space\n:::") == 2
+    assert "Dos.\n\n::: scene-space\n:::\n\nTres." in marked
+    assert "Tres.\n\n::: scene-space\n:::\n\nCuatro." in marked
+
+
+def test_the_scene_space_is_set_for_each_format():
+    lua = run.SCENES_FILTER.read_text(encoding="utf-8")
+    assert '"#scene-space"' in lua
+    assert '"<w:p/>"' in lua
+    assert "#let scene-space = " in run.TEMPLATE.read_text(encoding="utf-8")
+    assert "div.scene-space + p { text-indent: 0; }" in run.epub_css(run.FONTS["libertinus"])
+
+
+def test_every_format_runs_the_filters(tmp_path, monkeypatch):
+    class Printed:
+        returncode = 0
+        stdout = docx_with(THEME)
+        stderr = b""
+
+    monkeypatch.setattr(run.subprocess, "run", lambda *a, **k: Printed())
+    filters = run.filter_args(LAYOUT)
+    to_typst = run.pdf_commands(Path("m.md"), tmp_path, Path("b.pdf"), LAYOUT)[0]
+    epub = run.epub_command(Path("m.md"), tmp_path, Path("b.epub"), LAYOUT)
+    docx = run.docx_command(Path("m.md"), tmp_path, Path("b.docx"), LAYOUT)
+    for command in (to_typst, epub, docx):
+        assert all(arg in command for arg in filters)

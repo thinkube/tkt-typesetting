@@ -30,6 +30,12 @@ from typesetter.options import FONTS, FORMATS, LANGUAGES, PAPERS, Font, Layout, 
 
 TEMPLATE = Path(__file__).with_name("book.typst")
 DROPCAP_FILTER = Path(__file__).with_name("dropcap.lua")
+SCENES_FILTER = Path(__file__).with_name("scenes.lua")
+
+# A YAML front matter block at the start, as pandoc reads it.
+FRONT_MATTER = re.compile(r"\A---[ \t]*\n.*?\n(?:---|\.\.\.)[ \t]*\n", re.S)
+# The end of a line, then two or more blank lines.
+SCENE_BREAK = re.compile(r"\n(?:[ \t]*\n){2,}")
 
 # The Latin theme fonts of pandoc's reference.docx; Word's text styles take
 # their face from them.
@@ -74,9 +80,23 @@ def pandoc_common(source: Path, layout: Layout) -> List[str]:
     return ["pandoc", str(source), "--from=markdown", f"--metadata=lang={layout.lang}"]
 
 
-def dropcap_args(layout: Layout) -> List[str]:
-    """The filter that opens each chapter with a dropped capital, and the level it reads."""
-    return [f"--lua-filter={DROPCAP_FILTER}", f"--metadata=chapter-level={layout.chapter_level}"]
+def filter_args(layout: Layout) -> List[str]:
+    """The filters: scene spaces first, then the dropped capital, with the chapter level it reads."""
+    return [f"--lua-filter={SCENES_FILTER}", f"--lua-filter={DROPCAP_FILTER}",
+            f"--metadata=chapter-level={layout.chapter_level}"]
+
+
+def mark_scene_breaks(text: str) -> str:
+    """Two or more blank lines in a row in the body become a scene-space div (scenes.lua).
+
+    Markdown reads any number of blank lines as one paragraph break; in a
+    manuscript the extra ones mark a change of scene. The YAML front matter
+    is left as it is."""
+    front = ""
+    match = FRONT_MATTER.match(text)
+    if match:
+        front, text = text[:match.end()], text[match.end():]
+    return front + SCENE_BREAK.sub("\n\n::: scene-space\n:::\n\n", text)
 
 
 def pdf_commands(source: Path, work: Path, out: Path, layout: Layout) -> List[List[str]]:
@@ -85,7 +105,7 @@ def pdf_commands(source: Path, work: Path, out: Path, layout: Layout) -> List[Li
     typ = work / "book.typ"
     return [
         pandoc_common(source, layout) + ["--to=typst", f"--template={TEMPLATE}", f"--output={typ}"]
-        + dropcap_args(layout) + typst_variables(layout),
+        + filter_args(layout) + typst_variables(layout),
         ["typst", "compile", "--font-path", font_dir, str(typ), str(out)],
     ]
 
@@ -117,6 +137,9 @@ def epub_css(font: Font) -> str:
         "hr { border: none; margin: 1.2em 0; text-align: center; }\n"
         'hr::after { content: "* * *"; }\n'
         # The chapter's first paragraph, marked by dropcap.lua when it starts with a letter.
+        # Two or more blank lines in the manuscript, marked by scenes.lua.
+        "div.scene-space { height: 1.2em; }\n"
+        "div.scene-space + p { text-indent: 0; }\n"
         "div.opening > p { text-indent: 0; }\n"
         "div.opening > p::first-letter { float: left; font-size: 3.3em; line-height: 0.82; "
         "margin: 0.04em 0.08em 0 0; }\n"
@@ -129,7 +152,7 @@ def epub_command(source: Path, work: Path, out: Path, layout: Layout) -> List[st
     css.write_text(epub_css(font), encoding="utf-8")
     command = pandoc_common(source, layout) + [
         "--to=epub3", f"--output={out}", f"--css={css}", f"--split-level={layout.chapter_level}",
-    ] + dropcap_args(layout)
+    ] + filter_args(layout)
     command += [f"--epub-embed-font={font.directory}/{f}" for f in font.files]
     if layout.toc:
         command += ["--toc", f"--toc-depth={layout.chapter_level}"]
@@ -160,7 +183,7 @@ def docx_command(source: Path, work: Path, out: Path, layout: Layout) -> List[st
         raise ToolFailed(f"pandoc could not print its reference.docx: {printed.stderr.decode().strip()}")
     default = printed.stdout
     reference.write_bytes(reference_docx(default, FONTS[layout.font].family))
-    return pandoc_common(source, layout) + docx_options(out, reference, layout)
+    return pandoc_common(source, layout) + docx_options(out, reference, layout) + filter_args(layout)
 
 
 def docx_options(out: Path, reference: Path, layout: Layout) -> List[str]:
@@ -177,6 +200,9 @@ def typeset(source: Path, output: Path, layout: Layout) -> dict:
     pages = None
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
+        marked = work / "manuscript.md"
+        marked.write_text(mark_scene_breaks(source.read_text(encoding="utf-8")), encoding="utf-8")
+        source = marked
         for name in layout.formats:
             out = output / FORMATS[name].filename
             if name == "pdf":

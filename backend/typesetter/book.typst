@@ -36,6 +36,10 @@
 #let scene-break = align(center, block(above: 1.2em, below: 1.2em)[\*#h(1.2em)\*#h(1.2em)\*])
 #let divider(..args) = scene-break
 #let horizontalRule = scene-break
+// Two or more blank lines in the manuscript (scenes.lua): a blank line's
+// height. The paragraph after it is a block's follower, so it is not
+// indented, as after a scene break in a printed book.
+#let scene-space = block(above: 0.62em, below: 0.62em, height: 1em)
 
 $if(highlighting-definitions)$
 $highlighting-definitions$
