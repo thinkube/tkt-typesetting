@@ -66,6 +66,7 @@ def test_pdf_is_pandoc_to_typst_then_typst_with_the_face_directory(tmp_path):
     assert to_typst[:4] == ["pandoc", "m.md", "--from=markdown", "--metadata=lang=es"]
     assert "--to=typst" in to_typst
     assert f"--template={run.TEMPLATE}" in to_typst
+    assert f"--lua-filter={run.DROPCAP_FILTER}" in to_typst
     assert compile_pdf == ["typst", "compile", "--font-path", FONTS["eb-garamond"].directory,
                            str(tmp_path / "book.typ"), "out/book.pdf"]
     query = run.page_count_command(tmp_path, LAYOUT)
@@ -82,8 +83,10 @@ def test_epub_embeds_the_four_styles_and_splits_at_chapters(tmp_path):
     assert [a for a in command if a.startswith("--epub-embed-font=")] == [
         f"--epub-embed-font={font.directory}/{f}" for f in font.files]
     assert ["--toc", "--toc-depth=2"] == command[-2:]
+    assert f"--lua-filter={run.DROPCAP_FILTER}" in command
 
     css = (tmp_path / "book.css").read_text(encoding="utf-8")
+    assert "div.opening > p::first-letter" in css
     assert css.count("@font-face") == 4
     for filename in font.files:
         assert f'url("../fonts/{filename}")' in css
@@ -96,10 +99,24 @@ def test_word_has_contents_down_to_the_chapter_level_when_asked():
     assert "--toc" not in run.docx_options(Path("b.docx"), Path("r.docx"), Layout(formats=["docx"]))
 
 
-def test_the_title_page_back_carries_place_and_date():
+def test_place_and_date_go_on_a_recto_in_italics_set_right_at_a_fifth_of_the_page():
     template = run.TEMPLATE.read_text(encoding="utf-8")
-    assert "$place$, $date$" in template
+    assert "#place(top + right, dy: 0.2 * $page-height$ - $margin-top$)[#emph[$place$$if(date)$, $date$$endif$]]" in template
     assert "$elseif(date)$" in template
+    # Title page, its blank back, the place and date, their blank back.
+    front = template[template.index("$if(title)$\n#page"):template.index("$if(book-toc)$")]
+    assert front.count("#page(numbering: none)[]") == 3
+
+
+def test_chapters_open_with_a_dropped_capital_from_the_packaged_droplet():
+    template = run.TEMPLATE.read_text(encoding="utf-8")
+    assert '#import "@preview/droplet:0.3.1": dropcap' in template
+    containerfile = (Path(__file__).parents[1] / "Containerfile").read_text(encoding="utf-8")
+    assert "ARG DROPLET_VERSION=0.3.1" in containerfile
+    lua = run.DROPCAP_FILTER.read_text(encoding="utf-8")
+    assert '"#dropcap(' in lua
+    assert '"opening"' in lua
+    assert run.dropcap_args(LAYOUT) == [f"--lua-filter={run.DROPCAP_FILTER}", "--metadata=chapter-level=2"]
 
 
 def test_the_contents_title_is_not_a_part_page():

@@ -29,6 +29,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from typesetter.options import FONTS, FORMATS, LANGUAGES, PAPERS, Font, Layout, parse_formats
 
 TEMPLATE = Path(__file__).with_name("book.typst")
+DROPCAP_FILTER = Path(__file__).with_name("dropcap.lua")
 
 # The Latin theme fonts of pandoc's reference.docx; Word's text styles take
 # their face from them.
@@ -73,13 +74,18 @@ def pandoc_common(source: Path, layout: Layout) -> List[str]:
     return ["pandoc", str(source), "--from=markdown", f"--metadata=lang={layout.lang}"]
 
 
+def dropcap_args(layout: Layout) -> List[str]:
+    """The filter that opens each chapter with a dropped capital, and the level it reads."""
+    return [f"--lua-filter={DROPCAP_FILTER}", f"--metadata=chapter-level={layout.chapter_level}"]
+
+
 def pdf_commands(source: Path, work: Path, out: Path, layout: Layout) -> List[List[str]]:
     """pandoc writes the Typst source; Typst sets it, with the face's directory on its font path."""
     font_dir = FONTS[layout.font].directory
     typ = work / "book.typ"
     return [
         pandoc_common(source, layout) + ["--to=typst", f"--template={TEMPLATE}", f"--output={typ}"]
-        + typst_variables(layout),
+        + dropcap_args(layout) + typst_variables(layout),
         ["typst", "compile", "--font-path", font_dir, str(typ), str(out)],
     ]
 
@@ -110,6 +116,10 @@ def epub_css(font: Font) -> str:
         "h1 + p, h2 + p, h3 + p, hr + p { text-indent: 0; }\n"
         "hr { border: none; margin: 1.2em 0; text-align: center; }\n"
         'hr::after { content: "* * *"; }\n'
+        # The chapter's first paragraph, marked by dropcap.lua when it starts with a letter.
+        "div.opening > p { text-indent: 0; }\n"
+        "div.opening > p::first-letter { float: left; font-size: 3.3em; line-height: 0.82; "
+        "margin: 0.04em 0.08em 0 0; }\n"
     )
 
 
@@ -119,7 +129,7 @@ def epub_command(source: Path, work: Path, out: Path, layout: Layout) -> List[st
     css.write_text(epub_css(font), encoding="utf-8")
     command = pandoc_common(source, layout) + [
         "--to=epub3", f"--output={out}", f"--css={css}", f"--split-level={layout.chapter_level}",
-    ]
+    ] + dropcap_args(layout)
     command += [f"--epub-embed-font={font.directory}/{f}" for f in font.files]
     if layout.toc:
         command += ["--toc", f"--toc-depth={layout.chapter_level}"]

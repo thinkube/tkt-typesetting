@@ -45,7 +45,9 @@ date: "2026"
 A scene break: three asterisks on a line of their own.
 ```
 
-In the PDF, the back of the title page carries `place` and `date` at its foot ("Vielha, 2026"), and is blank without them; EPUB and Word show `date` on their title page. With `toc`, the PDF has a contents page after it, the EPUB a contents page, and the Word document a contents field that Word fills in when the file is opened.
+In the PDF, the title page is a recto with a blank back. `place` and `date` ("Vielha, 2026") go on the next recto, in italics, set right at a fifth of the page's height, also with a blank back, so the contents or the first part start on a recto. EPUB and Word show `date` on their title page.
+
+Each chapter opens with a dropped capital three lines high: in the PDF with the [droplet](https://typst.app/universe/package/droplet) package, which the image carries, and in the EPUB with the stylesheet. A chapter whose first paragraph starts with a dialogue dash or quotation marks gets none. Word documents have no dropped capitals. With `toc`, the PDF has a contents page after it, the EPUB a contents page, and the Word document a contents field that Word fills in when the file is opened.
 
 In the PDF, a heading at `chapter_level` starts a new page; a heading above it (fewer `#`) is a part title on a page of its own; a heading below it is set in the text. The EPUB starts a new file at each chapter. Paragraphs are justified, indented and set without space between them, and Typst avoids widows and orphans.
 

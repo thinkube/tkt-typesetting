@@ -6,9 +6,15 @@
 //
 // Headings at chapter-level start a page; headings above it are part
 // titles on a page of their own; headings below it are set in the text.
-// The title page's back carries the place and date of the front matter
-// (place:, date:) at its foot, and is blank without them.
-// A thematic break (*** in Markdown) is a scene break.
+// The title page is a recto with a blank back. The place and date of the
+// front matter (place:, date:) go on the next recto, in italics, set right
+// at a fifth of the page's height, again with a blank back, so what follows
+// starts on a recto.
+// A thematic break (*** in Markdown) is a scene break. The first paragraph
+// of a chapter opens with a dropped capital: dropcap.lua wraps it in
+// #dropcap, from the droplet package the image carries.
+
+#import "@preview/droplet:0.3.1": dropcap
 
 #set terms(hanging-indent: 1.5em)
 #set table(inset: 6pt, stroke: none)
@@ -118,19 +124,18 @@ $if(author)$
 $endif$
   #v(2fr)
 ]
-#page(numbering: none)[
-  #set align(center)
-  #v(1fr)
+#page(numbering: none)[]
 $if(place)$
-$if(date)$
-  $place$, $date$
-$else$
-  $place$
-$endif$
-$elseif(date)$
-  $date$
-$endif$
+#page(numbering: none)[
+  #place(top + right, dy: 0.2 * $page-height$ - $margin-top$)[#emph[$place$$if(date)$, $date$$endif$]]
 ]
+#page(numbering: none)[]
+$elseif(date)$
+#page(numbering: none)[
+  #place(top + right, dy: 0.2 * $page-height$ - $margin-top$)[#emph[$date$]]
+]
+#page(numbering: none)[]
+$endif$
 #counter(page).update(1)
 
 $endif$
