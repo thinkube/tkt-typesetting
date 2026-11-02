@@ -42,6 +42,10 @@ $highlighting-definitions$
 
 $endif$
 #let chapter-level = $chapter-level$
+// The paragraph indent. dropcap.lua indents the paragraph after a dropped
+// capital with it by hand: Typst does not indent a paragraph that follows
+// a block, and droplet sets the opening paragraph as one.
+#let paragraph-indent = 1.2em
 
 #set document(
 $if(title)$
@@ -73,7 +77,7 @@ $endif$
   justify: true,
   leading: 0.62em,
   spacing: 0.62em,
-  first-line-indent: 1.2em,
+  first-line-indent: paragraph-indent,
 )
 
 #show heading: set text(weight: "regular", hyphenate: false)

@@ -116,6 +116,10 @@ def test_chapters_open_with_a_dropped_capital_from_the_packaged_droplet():
     lua = run.DROPCAP_FILTER.read_text(encoding="utf-8")
     assert '"#dropcap(' in lua
     assert '"opening"' in lua
+    # The paragraph after the capital is indented by hand with the template's own indent.
+    assert '"#h(paragraph-indent)"' in lua
+    assert "#let paragraph-indent = " in template
+    assert "first-line-indent: paragraph-indent," in template
     assert run.dropcap_args(LAYOUT) == [f"--lua-filter={run.DROPCAP_FILTER}", "--metadata=chapter-level=2"]
 
 

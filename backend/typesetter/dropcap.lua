@@ -11,6 +11,8 @@
 -- dropped dash or quote is not a capital.
 
 local DROPCAP = "#dropcap(height: 3, gap: 0.25em)["
+-- book.typst's paragraph indent, for the paragraph after the dropped capital.
+local INDENT = "#h(paragraph-indent)"
 
 -- The first character of the text, as UTF-8.
 local function first_character(text)
@@ -42,6 +44,10 @@ function Pandoc(doc)
         if typst then
           block.content:insert(1, pandoc.RawInline("typst", DROPCAP))
           block.content:insert(pandoc.RawInline("typst", "]"))
+          local next_block = doc.blocks[i + 1]
+          if next_block and next_block.t == "Para" then
+            next_block.content:insert(1, pandoc.RawInline("typst", INDENT))
+          end
         else
           -- HTML-based output (EPUB): the stylesheet sets div.opening's first letter.
           doc.blocks[i] = pandoc.Div({ block }, pandoc.Attr("", { "opening" }))
