@@ -10,9 +10,16 @@
 -- dash, quotation marks, an opening question mark) is left as it is: a
 -- dropped dash or quote is not a capital.
 
-local DROPCAP = "#dropcap(height: 3, gap: 0.25em)["
--- book.typst's paragraph indent, for the paragraph after the dropped capital.
+-- Inside the capital's scope Typst's own first-line indent is off, and each
+-- paragraph after the first is indented by hand with book.typst's
+-- paragraph-indent: droplet sets some of them beside the capital and the
+-- rest below it, and the indent is the same in both places.
+local OPEN = "#{set par(first-line-indent: 0pt); dropcap(height: 3, gap: 0.25em)["
+local CLOSE = "]}"
 local INDENT = "#h(paragraph-indent)"
+-- Paragraphs after the first that go into the capital, so that a short first
+-- paragraph is followed beside the capital rather than by a gap.
+local FOLLOWERS = 2
 
 -- The first character of the text, as UTF-8.
 local function first_character(text)
@@ -42,8 +49,21 @@ function Pandoc(doc)
     elseif after_chapter then
       if block.t == "Para" and starts_with_letter(block) then
         if typst then
-          block.content:insert(1, pandoc.RawInline("typst", DROPCAP))
-          block.content:insert(pandoc.RawInline("typst", "]"))
+          block.content:insert(1, pandoc.RawInline("typst", OPEN))
+          local merged = 0
+          while merged < FOLLOWERS do
+            local follower = doc.blocks[i + 1]
+            if not (follower and follower.t == "Para") then
+              break
+            end
+            block.content:insert(pandoc.RawInline("typst", "\n\n" .. INDENT))
+            block.content:extend(follower.content)
+            doc.blocks:remove(i + 1)
+            merged = merged + 1
+          end
+          block.content:insert(pandoc.RawInline("typst", CLOSE))
+          -- Typst does not indent a paragraph that follows a block, and
+          -- droplet's output is one: the next paragraph is indented by hand.
           local next_block = doc.blocks[i + 1]
           if next_block and next_block.t == "Para" then
             next_block.content:insert(1, pandoc.RawInline("typst", INDENT))

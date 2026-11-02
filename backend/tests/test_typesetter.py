@@ -114,7 +114,10 @@ def test_chapters_open_with_a_dropped_capital_from_the_packaged_droplet():
     containerfile = (Path(__file__).parents[1] / "Containerfile").read_text(encoding="utf-8")
     assert "ARG DROPLET_VERSION=0.3.1" in containerfile
     lua = run.DROPCAP_FILTER.read_text(encoding="utf-8")
-    assert '"#dropcap(' in lua
+    assert 'dropcap(height: 3' in lua
+    # A short opening paragraph is followed beside the capital, not by a gap.
+    assert 'local FOLLOWERS = 2' in lua
+    assert 'set par(first-line-indent: 0pt)' in lua
     assert '"opening"' in lua
     # The paragraph after the capital is indented by hand with the template's own indent.
     assert '"#h(paragraph-indent)"' in lua
