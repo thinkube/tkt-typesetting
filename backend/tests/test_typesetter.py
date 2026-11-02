@@ -43,7 +43,7 @@ def test_formats_follow_the_listed_order_and_keep_unknown_names():
 
 def test_every_template_variable_is_in_the_template():
     template = run.TEMPLATE.read_text(encoding="utf-8")
-    names = [arg.split("=", 1)[0].removeprefix("--variable=") for arg in run.typst_variables(LAYOUT)]
+    names = [arg.removeprefix("--variable=").split("=", 1)[0] for arg in run.typst_variables(LAYOUT)]
     assert names == ["font", "font-size", "page-width", "page-height", "margin-inside", "margin-outside",
                      "margin-top", "margin-bottom", "chapter-level", "book-toc"]
     for name in names:
