@@ -52,7 +52,7 @@ An em dash stays with the word it touches: a closing dash ("—dice Marisa—.")
 
 One blank line is a paragraph break, as in any Markdown. Two or more blank lines in a row mark a change of scene: the PDF and the EPUB leave a blank line's space and start the next paragraph without an indent; Word gets an empty paragraph. Next to a heading such a space is dropped.
 
-In the PDF, the title page is a recto with a blank back. `place` and `date` ("Vielha, 2026") go on the next recto, in italics, set right at a fifth of the page's height, also with a blank back, so the contents or the first part start on a recto. EPUB and Word show `date` on their title page.
+In the PDF, the title page is a recto with a blank back. `place` and `date` ("Vielha, 2026") go on the next recto, in italics, set right at a fifth of the page's height, also with a blank back, so the contents or the first part start on a recto. The Word document has the same pages; the EPUB gives the line a page of its own. None of the three repeats the date on the title page.
 
 Each chapter opens with a dropped capital three lines high: in the PDF with the [droplet](https://typst.app/universe/package/droplet) package, which the image carries, and in the EPUB with the stylesheet. A chapter whose first paragraph starts with a dialogue dash or quotation marks gets none. Word documents have no dropped capitals. With `toc`, the PDF has a contents page after it, the EPUB a contents page, and the Word document a contents field that Word fills in when the file is opened.
 

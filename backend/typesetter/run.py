@@ -32,6 +32,7 @@ TEMPLATE = Path(__file__).with_name("book.typst")
 DROPCAP_FILTER = Path(__file__).with_name("dropcap.lua")
 SCENES_FILTER = Path(__file__).with_name("scenes.lua")
 DASHES_FILTER = Path(__file__).with_name("dashes.lua")
+FRONTMATTER_FILTER = Path(__file__).with_name("frontmatter.lua")
 
 # A YAML front matter block at the start, as pandoc reads it.
 FRONT_MATTER = re.compile(r"\A---[ \t]*\n.*?\n(?:---|\.\.\.)[ \t]*\n", re.S)
@@ -88,6 +89,15 @@ def filter_args(layout: Layout) -> List[str]:
             f"--metadata=chapter-level={layout.chapter_level}"]
 
 
+def frontmatter_args(layout: Layout) -> List[str]:
+    """The place-and-date page for EPUB and Word (book.typst sets it in the PDF). Its
+    space before puts the line at a fifth of the page height: the top margin is
+    already there, so it is the rest, in twentieths of a point."""
+    paper = PAPERS[layout.paper]
+    before = round((0.2 * paper.height_mm - paper.top_mm) * TWIPS_PER_MM)
+    return [f"--lua-filter={FRONTMATTER_FILTER}", f"--metadata=place-space-before={before}"]
+
+
 def mark_scene_breaks(text: str) -> str:
     """Two or more blank lines in a row in the body become a scene-space div (scenes.lua).
 
@@ -140,6 +150,8 @@ def epub_css(font: Font) -> str:
         'hr::after { content: "* * *"; }\n'
         # The chapter's first paragraph, marked by dropcap.lua when it starts with a letter.
         # Two or more blank lines in the manuscript, marked by scenes.lua.
+        # The place and date of the front matter (frontmatter.lua), on a page of their own.
+        "div.place-date { page-break-before: always; page-break-after: always; margin-top: 20vh; text-align: right; }\n"
         "div.scene-space { height: 1.2em; }\n"
         "div.scene-space + p { text-indent: 0; }\n"
         "div.opening > p { text-indent: 0; }\n"
@@ -154,7 +166,7 @@ def epub_command(source: Path, work: Path, out: Path, layout: Layout) -> List[st
     css.write_text(epub_css(font), encoding="utf-8")
     command = pandoc_common(source, layout) + [
         "--to=epub3", f"--output={out}", f"--css={css}", f"--split-level={layout.chapter_level}",
-    ] + filter_args(layout)
+    ] + frontmatter_args(layout) + filter_args(layout)
     command += [f"--epub-embed-font={font.directory}/{f}" for f in font.files]
     if layout.toc:
         command += ["--toc", f"--toc-depth={layout.chapter_level}"]
@@ -296,7 +308,8 @@ def docx_command(source: Path, work: Path, out: Path, layout: Layout) -> List[st
         raise ToolFailed(f"pandoc could not print its reference.docx: {printed.stderr.decode().strip()}")
     default = printed.stdout
     reference.write_bytes(reference_docx(default, layout))
-    return pandoc_common(source, layout) + docx_options(out, reference, layout) + filter_args(layout)
+    return (pandoc_common(source, layout) + docx_options(out, reference, layout)
+            + frontmatter_args(layout) + filter_args(layout))
 
 
 def docx_options(out: Path, reference: Path, layout: Layout) -> List[str]:

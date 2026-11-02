@@ -273,3 +273,29 @@ def test_em_dashes_are_held_to_the_words_they_touch():
     assert 'WORD_JOINER = "\\u{2060}"' in lua
     assert '"([^%s])" .. DASH' in lua
     assert 'DASH .. "([^%s])"' in lua
+
+
+def test_place_and_date_get_their_own_page_in_epub_and_word_too(tmp_path, monkeypatch):
+    paper = PAPERS["15x23cm"]
+    before = round((0.2 * paper.height_mm - paper.top_mm) * 1440 / 25.4)
+    assert run.frontmatter_args(LAYOUT) == [f"--lua-filter={run.FRONTMATTER_FILTER}",
+                                            f"--metadata=place-space-before={before}"]
+
+    class Printed:
+        returncode = 0
+        stdout = docx_with(THEME)
+        stderr = b""
+
+    monkeypatch.setattr(run.subprocess, "run", lambda *a, **k: Printed())
+    filter_arg = f"--lua-filter={run.FRONTMATTER_FILTER}"
+    assert filter_arg in run.epub_command(Path("m.md"), tmp_path, Path("b.epub"), LAYOUT)
+    assert filter_arg in run.docx_command(Path("m.md"), tmp_path, Path("b.docx"), LAYOUT)
+    # The PDF's place-and-date page is book.typst's.
+    assert filter_arg not in run.pdf_commands(Path("m.md"), tmp_path, Path("b.pdf"), LAYOUT)[0]
+    assert "div.place-date" in run.epub_css(run.FONTS["eb-garamond"])
+
+    lua = run.FRONTMATTER_FILTER.read_text(encoding="utf-8")
+    assert '"<w:p><w:pPr><w:pageBreakBefore/></w:pPr>"' in lua
+    assert '<w:jc w:val=\\"right\\"/>' in lua
+    assert '"place-date"' in lua
+    assert "doc.meta.date = nil" in lua
