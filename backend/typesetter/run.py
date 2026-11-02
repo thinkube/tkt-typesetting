@@ -31,6 +31,7 @@ from typesetter.options import FONTS, FORMATS, LANGUAGES, PAPERS, Font, Layout, 
 TEMPLATE = Path(__file__).with_name("book.typst")
 DROPCAP_FILTER = Path(__file__).with_name("dropcap.lua")
 SCENES_FILTER = Path(__file__).with_name("scenes.lua")
+DASHES_FILTER = Path(__file__).with_name("dashes.lua")
 
 # A YAML front matter block at the start, as pandoc reads it.
 FRONT_MATTER = re.compile(r"\A---[ \t]*\n.*?\n(?:---|\.\.\.)[ \t]*\n", re.S)
@@ -81,8 +82,9 @@ def pandoc_common(source: Path, layout: Layout) -> List[str]:
 
 
 def filter_args(layout: Layout) -> List[str]:
-    """The filters: scene spaces first, then the dropped capital, with the chapter level it reads."""
-    return [f"--lua-filter={SCENES_FILTER}", f"--lua-filter={DROPCAP_FILTER}",
+    """The filters: scene spaces, em dashes held to their words, then the dropped capital,
+    with the chapter level it reads."""
+    return [f"--lua-filter={SCENES_FILTER}", f"--lua-filter={DASHES_FILTER}", f"--lua-filter={DROPCAP_FILTER}",
             f"--metadata=chapter-level={layout.chapter_level}"]
 
 

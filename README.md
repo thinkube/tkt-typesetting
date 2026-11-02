@@ -48,6 +48,8 @@ A scene break: three asterisks on a line of their own.
 Two or more blank lines: a change of scene set as a blank line's space.
 ```
 
+An em dash stays with the word it touches: a closing dash ("—dice Marisa—.") never starts a line, and an opening one never ends a line. A dash with a space on one side still breaks at the space.
+
 One blank line is a paragraph break, as in any Markdown. Two or more blank lines in a row mark a change of scene: the PDF and the EPUB leave a blank line's space and start the next paragraph without an indent; Word gets an empty paragraph. Next to a heading such a space is dropped.
 
 In the PDF, the title page is a recto with a blank back. `place` and `date` ("Vielha, 2026") go on the next recto, in italics, set right at a fifth of the page's height, also with a blank back, so the contents or the first part start on a recto. EPUB and Word show `date` on their title page.

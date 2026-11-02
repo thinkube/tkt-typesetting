@@ -123,8 +123,8 @@ def test_chapters_open_with_a_dropped_capital_from_the_packaged_droplet():
     assert '"#h(paragraph-indent)"' in lua
     assert "#let paragraph-indent = " in template
     assert "first-line-indent: paragraph-indent," in template
-    assert run.filter_args(LAYOUT) == [f"--lua-filter={run.SCENES_FILTER}", f"--lua-filter={run.DROPCAP_FILTER}",
-                                       "--metadata=chapter-level=2"]
+    assert run.filter_args(LAYOUT) == [f"--lua-filter={run.SCENES_FILTER}", f"--lua-filter={run.DASHES_FILTER}",
+                                       f"--lua-filter={run.DROPCAP_FILTER}", "--metadata=chapter-level=2"]
 
 
 def test_the_contents_title_is_not_a_part_page():
@@ -197,3 +197,10 @@ def test_every_format_runs_the_filters(tmp_path, monkeypatch):
     docx = run.docx_command(Path("m.md"), tmp_path, Path("b.docx"), LAYOUT)
     for command in (to_typst, epub, docx):
         assert all(arg in command for arg in filters)
+
+
+def test_em_dashes_are_held_to_the_words_they_touch():
+    lua = run.DASHES_FILTER.read_text(encoding="utf-8")
+    assert 'WORD_JOINER = "\\u{2060}"' in lua
+    assert '"([^%s])" .. DASH' in lua
+    assert 'DASH .. "([^%s])"' in lua
