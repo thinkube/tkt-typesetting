@@ -150,7 +150,15 @@ def docx_command(source: Path, work: Path, out: Path, layout: Layout) -> List[st
         raise ToolFailed(f"pandoc could not print its reference.docx: {printed.stderr.decode().strip()}")
     default = printed.stdout
     reference.write_bytes(reference_docx(default, FONTS[layout.font].family))
-    return pandoc_common(source, layout) + ["--to=docx", f"--output={out}", f"--reference-doc={reference}"]
+    return pandoc_common(source, layout) + docx_options(out, reference, layout)
+
+
+def docx_options(out: Path, reference: Path, layout: Layout) -> List[str]:
+    """pandoc's Word options. The contents are a field Word fills in when the document is opened."""
+    options = ["--to=docx", f"--output={out}", f"--reference-doc={reference}"]
+    if layout.toc:
+        options += ["--toc", f"--toc-depth={layout.chapter_level}"]
+    return options
 
 
 def typeset(source: Path, output: Path, layout: Layout) -> dict:

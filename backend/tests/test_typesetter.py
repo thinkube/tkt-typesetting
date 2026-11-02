@@ -90,6 +90,22 @@ def test_epub_embeds_the_four_styles_and_splits_at_chapters(tmp_path):
     assert 'font-family: "EB Garamond", serif' in css
 
 
+def test_word_has_contents_down_to_the_chapter_level_when_asked():
+    options = run.docx_options(Path("out/book.docx"), Path("ref.docx"), LAYOUT)
+    assert options == ["--to=docx", "--output=out/book.docx", "--reference-doc=ref.docx", "--toc", "--toc-depth=2"]
+    assert "--toc" not in run.docx_options(Path("b.docx"), Path("r.docx"), Layout(formats=["docx"]))
+
+
+def test_the_title_page_back_carries_place_and_date():
+    template = run.TEMPLATE.read_text(encoding="utf-8")
+    assert "$place$, $date$" in template
+    assert "$elseif(date)$" in template
+
+
+def test_the_contents_title_is_not_a_part_page():
+    assert "if not it.outlined" in run.TEMPLATE.read_text(encoding="utf-8")
+
+
 def test_the_word_reference_takes_the_face_in_both_theme_fonts():
     patched = run.reference_docx(docx_with(THEME), "Crimson Pro")
     with ZipFile(BytesIO(patched)) as z:

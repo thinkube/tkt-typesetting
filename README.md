@@ -32,6 +32,8 @@ Markdown in UTF-8, as pandoc reads it. The title page comes from the YAML front 
 title: "The title"
 subtitle: "An optional subtitle"
 author: "The author"
+place: "Vielha"
+date: "2026"
 ---
 
 ## Chapter 1
@@ -42,6 +44,8 @@ author: "The author"
 
 A scene break: three asterisks on a line of their own.
 ```
+
+In the PDF, the back of the title page carries `place` and `date` at its foot ("Vielha, 2026"), and is blank without them; EPUB and Word show `date` on their title page. With `toc`, the PDF has a contents page after it, the EPUB a contents page, and the Word document a contents field that Word fills in when the file is opened.
 
 In the PDF, a heading at `chapter_level` starts a new page; a heading above it (fewer `#`) is a part title on a page of its own; a heading below it is set in the text. The EPUB starts a new file at each chapter. Paragraphs are justified, indented and set without space between them, and Typst avoids widows and orphans.
 

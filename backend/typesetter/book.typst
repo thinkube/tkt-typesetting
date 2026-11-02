@@ -6,6 +6,8 @@
 //
 // Headings at chapter-level start a page; headings above it are part
 // titles on a page of their own; headings below it are set in the text.
+// The title page's back carries the place and date of the front matter
+// (place:, date:) at its foot, and is blank without them.
 // A thematic break (*** in Markdown) is a scene break.
 
 #set terms(hanging-indent: 1.5em)
@@ -71,8 +73,12 @@ $endif$
 #show heading: set text(weight: "regular", hyphenate: false)
 #show heading: set align(center)
 
+// The table of contents titles itself with a heading that is not in the
+// outline; it is set as a title on the contents page, not as a part.
 #show heading: it => {
-  if it.level < chapter-level {
+  if not it.outlined {
+    block(below: 2em, text(size: 1.4em)[#it.body])
+  } else if it.level < chapter-level {
     pagebreak(weak: true)
     page(numbering: none)[
       #v(1fr)
@@ -111,6 +117,19 @@ $if(author)$
   #text(size: 1.2em)[$for(author)$$author$$sep$ · $endfor$]
 $endif$
   #v(2fr)
+]
+#page(numbering: none)[
+  #set align(center)
+  #v(1fr)
+$if(place)$
+$if(date)$
+  $place$, $date$
+$else$
+  $place$
+$endif$
+$elseif(date)$
+  $date$
+$endif$
 ]
 #counter(page).update(1)
 
