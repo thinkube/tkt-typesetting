@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from io import BytesIO
 from pathlib import Path
 from typing import List, Optional
@@ -301,6 +302,71 @@ def reference_docx(default: bytes, layout: Layout) -> bytes:
     return target.getvalue()
 
 
+FONT_TABLE_RELS = "word/_rels/fontTable.xml.rels"
+# The order Word's schema gives the four embedded styles of a font (CT_Font), with
+# the index of each in Font.embed (regular, italic, bold, bold italic).
+EMBED_SLOTS = (("embedRegular", 0), ("embedBold", 2), ("embedItalic", 1), ("embedBoldItalic", 3))
+
+
+def obfuscate_font(data: bytes, key: str) -> bytes:
+    """An embedded font as Word stores it (ECMA-376, 17.8.1): the first 32 bytes XORed
+    with the font key, a GUID read as 16 bytes in reverse order. The same call undoes it."""
+    guid = bytes.fromhex(key.strip("{}").replace("-", ""))[::-1]
+    return bytes(b ^ guid[i % 16] for i, b in enumerate(data[:32])) + data[32:]
+
+
+def embed_docx_fonts(docx: bytes, font: Font, keys: Optional[List[str]] = None) -> bytes:
+    """The Word document with the face's four TrueType styles embedded, so it shows in
+    that face on a computer that does not have it: the obfuscated files under
+    word/fonts, the font table entry naming them with their keys, and the setting
+    that tells Word the document carries its fonts."""
+    keys = keys or [f"{{{str(uuid.uuid4()).upper()}}}" for _ in EMBED_SLOTS]
+    source = ZipFile(BytesIO(docx))
+    names = source.namelist()
+    if FONT_TABLE_RELS in names:
+        raise ToolFailed(f"the Word document already has {FONT_TABLE_RELS}; its embedded fonts would be replaced")
+    entries = []
+    relationships = []
+    parts = {}
+    for n, (slot, index) in enumerate(EMBED_SLOTS, start=1):
+        rid = f"rIdTkFont{n}"
+        entries.append(f'<w:{slot} r:id="{rid}" w:fontKey="{keys[n - 1]}" />')
+        relationships.append(
+            f'<Relationship Id="{rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/font" '
+            f'Target="fonts/font{n}.odttf" />')
+        parts[f"word/fonts/font{n}.odttf"] = obfuscate_font(Path(font.embed[index]).read_bytes(), keys[n - 1])
+    entry = (f'<w:font w:name="{font.family}"><w:charset w:val="00" /><w:family w:val="roman" />'
+             f'<w:pitch w:val="variable" />{"".join(entries)}</w:font>')
+
+    target = BytesIO()
+    with ZipFile(target, "w", ZIP_DEFLATED) as out:
+        for item in source.infolist():
+            data = source.read(item)
+            if item.filename == "word/fontTable.xml":
+                text = data.decode("utf-8")
+                # A plain entry for the family, without embedding, gives way to the embedded one.
+                text = re.sub(rf'<w:font w:name="{re.escape(font.family)}">.*?</w:font>', "", text, flags=re.S)
+                data = replace_once(text, r"</w:fonts>", entry + "</w:fonts>", "the font table").encode("utf-8")
+            elif item.filename == "word/settings.xml":
+                data = replace_once(data.decode("utf-8"), r"<w:embedSystemFonts\s*/>",
+                                    "<w:embedTrueTypeFonts /><w:embedSystemFonts />",
+                                    "the embedded-font settings").encode("utf-8")
+            elif item.filename == "[Content_Types].xml":
+                text = data.decode("utf-8")
+                if 'Extension="odttf"' not in text:
+                    text = replace_once(text, r"</Types>", '<Default Extension="odttf" ContentType="application/'
+                                        'vnd.openxmlformats-officedocument.obfuscatedFont" /></Types>',
+                                        "the content types")
+                data = text.encode("utf-8")
+            out.writestr(item, data)
+        out.writestr(FONT_TABLE_RELS, '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                     + "".join(relationships) + "</Relationships>")
+        for name, data in parts.items():
+            out.writestr(name, data)
+    return target.getvalue()
+
+
 def docx_command(source: Path, work: Path, out: Path, layout: Layout) -> List[str]:
     reference = work / "reference.docx"
     printed = subprocess.run(["pandoc", "--print-default-data-file", "reference.docx"], capture_output=True)
@@ -339,6 +405,7 @@ def typeset(source: Path, output: Path, layout: Layout) -> dict:
                 run_tool(epub_command(source, work, out, layout))
             elif name == "docx":
                 run_tool(docx_command(source, work, out, layout))
+                out.write_bytes(embed_docx_fonts(out.read_bytes(), FONTS[layout.font]))
     return {
         "formats": layout.formats,
         "pages": pages,

@@ -299,3 +299,65 @@ def test_place_and_date_get_their_own_page_in_epub_and_word_too(tmp_path, monkey
     assert '<w:jc w:val=\\"right\\"/>' in lua
     assert '"place-date"' in lua
     assert "doc.meta.date = nil" in lua
+
+
+def test_word_gets_no_opening_wrapper():
+    lua = run.DROPCAP_FILTER.read_text(encoding="utf-8")
+    assert 'elseif FORMAT:match("epub") then' in lua
+
+
+EMBED_KEYS = [f"{{0000000{n}-0000-0000-0000-00000000000{n}}}" for n in range(1, 5)]
+
+
+def word_document():
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as z:
+        z.writestr("[Content_Types].xml", '<Types><Default Extension="xml" ContentType="application/xml" /></Types>')
+        z.writestr("word/fontTable.xml", '<w:fonts xmlns:r="r" xmlns:w="w"><w:font w:name="Calibri"></w:font>'
+                   '<w:font w:name="EB Garamond"><w:charset w:val="00" /></w:font></w:fonts>')
+        z.writestr("word/settings.xml", '<w:settings><w:zoom w:percent="100" /><w:embedSystemFonts /></w:settings>')
+        z.writestr("word/document.xml", "<w:document />")
+    return buffer.getvalue()
+
+
+def face_with_files(tmp_path):
+    files = []
+    for n, style in enumerate(("Regular", "Italic", "Bold", "BoldItalic")):
+        path = tmp_path / f"Face-{style}.ttf"
+        path.write_bytes(bytes([n]) * 64)
+        files.append(str(path))
+    return run.Font("eb-garamond", "EB Garamond", "/fonts", (), "", tuple(files))
+
+
+def test_word_documents_carry_their_face(tmp_path):
+    font = face_with_files(tmp_path)
+    z = ZipFile(BytesIO(run.embed_docx_fonts(word_document(), font, EMBED_KEYS)))
+    table = z.read("word/fontTable.xml").decode()
+    # One entry for the family, the four styles in the order Word's schema gives them.
+    assert table.count('w:name="EB Garamond"') == 1
+    assert re.findall(r"<w:(embed\w+) r:id", table) == ["embedRegular", "embedBold", "embedItalic", "embedBoldItalic"]
+    assert f'w:fontKey="{EMBED_KEYS[0]}"' in table
+    rels = z.read("word/_rels/fontTable.xml.rels").decode()
+    assert [f"fonts/font{n}.odttf" for n in range(1, 5)] == re.findall(r'Target="([^"]+)"', rels)
+    assert "<w:embedTrueTypeFonts /><w:embedSystemFonts />" in z.read("word/settings.xml").decode()
+    assert 'Extension="odttf"' in z.read("[Content_Types].xml").decode()
+    # font2 is the bold slot: the Bold file (index 2), obfuscated with the second key.
+    stored = z.read("word/fonts/font2.odttf")
+    assert stored != bytes([2]) * 64
+    assert run.obfuscate_font(stored, EMBED_KEYS[1]) == bytes([2]) * 64
+
+
+def test_the_obfuscation_follows_the_word_specification():
+    key = "{00112233-4455-6677-8899-AABBCCDDEEFF}"
+    data = bytes(range(40))
+    stored = run.obfuscate_font(data, key)
+    # The GUID's bytes in reverse order: the first byte meets 0xFF, the sixteenth 0x00.
+    assert stored[0] == 0x00 ^ 0xFF and stored[15] == 0x0F ^ 0x00 and stored[16] == 0x10 ^ 0xFF
+    assert stored[32:] == data[32:]
+    assert run.obfuscate_font(stored, key) == data
+
+
+def test_every_face_has_four_truetype_files_to_embed():
+    for font in FONTS.values():
+        assert len(font.embed) == 4
+        assert all(path.endswith(".ttf") for path in font.embed)

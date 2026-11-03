@@ -10,7 +10,7 @@ Upload a manuscript, choose the formats and the layout, and download the results
 |---|---|---|
 | `pdf` | `book.pdf` | pandoc writes Typst source through `backend/typesetter/book.typst`; Typst sets it |
 | `epub` | `book.epub` | pandoc's EPUB 3 writer, with the face embedded and one file per chapter |
-| `docx` | `book.docx` | pandoc's Word writer, with a reference document set for the book: the chosen face and size, the page size with mirrored margins, page numbers in the footer, parts and chapters on a new page, justified and indented paragraphs |
+| `docx` | `book.docx` | pandoc's Word writer, with a reference document set for the book: the chosen face and size, the page size with mirrored margins, page numbers in the footer, parts and chapters on a new page, justified and indented paragraphs; the face's four TrueType styles are embedded, so the document shows in it on a computer that does not have it |
 
 | Option | Values | Default |
 |---|---|---|

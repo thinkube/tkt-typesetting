@@ -12,6 +12,9 @@ from typing import Dict, List, Optional
 
 # Where the Containerfile installs the faces, one directory per family.
 FONT_ROOT = "/usr/local/share/fonts"
+# TrueType builds of the faces, embedded in Word documents (Word embeds TrueType
+# outlines). Outside FONT_ROOT, so Typst and fontconfig do not see them twice.
+EMBED_ROOT = "/usr/local/share/typesetting/embed"
 
 
 @dataclass(frozen=True)
@@ -30,6 +33,8 @@ class Font:
     # Regular, italic, bold and bold italic: the files an EPUB embeds.
     files: tuple
     description: str
+    # The same four styles as TrueType files, by full path: what a Word document embeds.
+    embed: tuple
 
 
 @dataclass(frozen=True)
@@ -58,21 +63,26 @@ FORMATS: Dict[str, OutputFormat] = {
     )
 }
 
+STYLES = ("Regular", "Italic", "Bold", "BoldItalic")
+
 FONTS: Dict[str, Font] = {
     f.name: f
     for f in (
         Font("eb-garamond", "EB Garamond", f"{FONT_ROOT}/ebgaramond",
              ("EBGaramond-Regular.otf", "EBGaramond-Italic.otf",
               "EBGaramond-Bold.otf", "EBGaramond-BoldItalic.otf"),
-             "Classic Garamond, with small caps and ligatures"),
+             "Classic Garamond, with small caps and ligatures",
+             tuple(f"{EMBED_ROOT}/ebgaramond/EBGaramond-{s}.ttf" for s in STYLES)),
         Font("crimson-pro", "Crimson Pro", f"{FONT_ROOT}/crimsonpro",
              ("CrimsonPro-Regular.ttf", "CrimsonPro-Italic.ttf",
               "CrimsonPro-Bold.ttf", "CrimsonPro-BoldItalic.ttf"),
-             "After old-style book faces, a little darker and very readable"),
+             "After old-style book faces, a little darker and very readable",
+             tuple(f"{FONT_ROOT}/crimsonpro/CrimsonPro-{s}.ttf" for s in STYLES)),
         Font("libertinus", "Libertinus Serif", f"{FONT_ROOT}/libertinus",
              ("LibertinusSerif-Regular.otf", "LibertinusSerif-Italic.otf",
               "LibertinusSerif-Bold.otf", "LibertinusSerif-BoldItalic.otf"),
-             "Clear and sober, good on screen"),
+             "Clear and sober, good on screen",
+             tuple(f"{EMBED_ROOT}/libertinus/LibertinusSerif-{s}.ttf" for s in STYLES)),
     )
 }
 

@@ -38,6 +38,8 @@ RUN apt-get update && \
 # The serif faces typesetter/options.py offers, one directory per family
 # under /usr/local/share/fonts. Each is pinned to a commit or a release. The
 # build stops if Typst does not see a family by the name options.py uses.
+# The TrueType builds of EB Garamond and Libertinus go to /usr/local/share/typesetting/embed
+# (EMBED_ROOT): Word embeds TrueType outlines; Crimson Pro is TrueType already.
 ARG EB_GARAMOND_COMMIT=106a4a6d377987459ae5e68673a4570f13b957fb
 ARG CRIMSON_PRO_COMMIT=475ca6a0469ba2bd9c2a3bbf038957099392c04d
 ARG LIBERTINUS_VERSION=7.051
@@ -55,6 +57,14 @@ RUN mkdir -p /usr/local/share/fonts/ebgaramond /usr/local/share/fonts/crimsonpro
         -o /tmp/libertinus.zip && \
     unzip -q -j /tmp/libertinus.zip "Libertinus-${LIBERTINUS_VERSION}/static/OTF/LibertinusSerif-*.otf" \
         -d /usr/local/share/fonts/libertinus && \
+    mkdir -p /usr/local/share/typesetting/embed/ebgaramond /usr/local/share/typesetting/embed/libertinus && \
+    for style in Regular Italic Bold BoldItalic; do \
+        curl --retry 5 --retry-delay 5 --retry-all-errors -fsSL \
+            "https://raw.githubusercontent.com/octaviopardo/EBGaramond12/${EB_GARAMOND_COMMIT}/fonts/ttf/EBGaramond-${style}.ttf" \
+            -o "/usr/local/share/typesetting/embed/ebgaramond/EBGaramond-${style}.ttf" || exit 1; \
+        unzip -q -j /tmp/libertinus.zip "Libertinus-${LIBERTINUS_VERSION}/static/TTF/LibertinusSerif-${style}.ttf" \
+            -d /usr/local/share/typesetting/embed/libertinus || exit 1; \
+    done && \
     rm /tmp/libertinus.zip && \
     fc-cache -f && \
     for family in "EB Garamond" "Crimson Pro" "Libertinus Serif"; do \

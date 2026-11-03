@@ -68,8 +68,9 @@ function Pandoc(doc)
           if next_block and next_block.t == "Para" then
             next_block.content:insert(1, pandoc.RawInline("typst", INDENT))
           end
-        else
-          -- HTML-based output (EPUB): the stylesheet sets div.opening's first letter.
+        elseif FORMAT:match("epub") then
+          -- EPUB: the stylesheet sets div.opening's first letter. Word gets no wrapper:
+          -- pandoc would make the paragraph after a div a "First Paragraph", unindented.
           doc.blocks[i] = pandoc.Div({ block }, pandoc.Attr("", { "opening" }))
         end
       end
